@@ -5,7 +5,6 @@ from telebot.storage import StateMemoryStorage
 
 bot = telebot.TeleBot('8088954048:AAEb7HgHkz9VR6OkoqVQSOS0hUkWORxzk9k')
 
-
 users = {
     '1184286159' : {
         'group': '6',
@@ -83,16 +82,17 @@ def handle_callbacks(callback):
     elif callback.data == 'confirm_general_deadline':
         bot.send_message(callback.message.chat.id, 'Отправляю дедлайн твоим одногруппникам')
         for user_id in users.keys():
-            bot.send_message(user_id, f"Новый дедлайн!\nНазвание: {new_deadline['name']}\nОписание: {new_deadline['desc']}\nСрок: {new_deadline['time']}")
-            users[user_id]['deadlines'].add(new_deadline)
-            new_deadline.clear()
+            if not(users[user_id]['is_elder']):
+                bot.send_message(user_id, f"Новый дедлайн!\nНазвание: {new_deadline['name']}\nОписание: {new_deadline['desc']}\nСрок: {new_deadline['time']}")
+                users[user_id]['deadlines'].append(new_deadline)
+        new_deadline.clear()
 
 @bot.message_handler(content_types=['text'])
-def add_general_deadline(message):
+def commands(message):
     if message.text == 'Добавить общий дедлайн':
         bot.send_message(message.chat.id, 'Напиши название дедлайна')
         bot.register_next_step_handler(message, deadline_desc)
-
+    elif message.text == 'Список дедлайнов'
 def deadline_desc(message):
     new_deadline['name'] = message.text
     bot.send_message(message.chat.id, 'Напиши описание дедлайна')
