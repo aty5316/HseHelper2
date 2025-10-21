@@ -25,7 +25,7 @@ def init_db():
             registered_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
         )
     ''')
-    
+
     # Таблица дедлайнов
     cursor.execute('''
         CREATE TABLE IF NOT EXISTS deadlines (
@@ -39,7 +39,7 @@ def init_db():
             FOREIGN KEY (user_id) REFERENCES users (user_id)
         )
     ''')
-    
+
     conn.commit()
     return conn
 
@@ -129,7 +129,7 @@ def delete_deadline(deadline_id, user_id):
 def menu(user_id):
     """Создать меню в зависимости от роли пользователя"""
     menumarkup = types.ReplyKeyboardMarkup(resize_keyboard=True)
-    
+
     user = get_user(user_id)
     if user and user['is_elder']:
         add_general_deadline = types.KeyboardButton('Добавить общий дедлайн')
@@ -149,7 +149,7 @@ def menu(user_id):
         buildings = types.KeyboardButton('Корпуса')
         elder = types.KeyboardButton('Староста')
         menumarkup.add(deadlines, add_deadline,time_table,contact,buildings,elder)
-    
+
     return menumarkup
 
 def validate_date(date_string):
@@ -165,7 +165,7 @@ def start(message):
     """Обработчик команды /start"""
     user_id = str(message.from_user.id)
     user = get_user(user_id)
-    
+
     if user:
         # Пользователь уже зарегистрирован
         delmarkup = types.InlineKeyboardMarkup()
@@ -173,7 +173,7 @@ def start(message):
         menu_btn = types.InlineKeyboardButton('Меню', callback_data='menu')
         delmarkup.row(del_btn, menu_btn)
         bot.send_message(
-            message.chat.id, 
+            message.chat.id,
             f'Привет, {user["first_name"]}! Ты уже зарегистрирован(а) в группе {user["group_number"]}.',
             reply_markup=delmarkup
         )
@@ -183,9 +183,9 @@ def start(message):
         regbtn = types.InlineKeyboardButton('Регистрация', callback_data='register')
         reg1markup.add(regbtn)
         bot.send_message(
-            message.chat.id, 
+            message.chat.id,
             f'Привет, {message.from_user.first_name}. Добро пожаловать в бота-помощника для студентов НИУ ВШЭ. '
-            'Для начала пройди регистрацию по кнопке ниже', 
+            'Для начала пройди регистрацию по кнопке ниже',
             reply_markup=reg1markup
         )
 
@@ -193,28 +193,28 @@ def start(message):
 def handle_callbacks(callback):
     """Обработчик callback-запросов"""
     user_id = str(callback.from_user.id)
-    
+
     if callback.data == 'register':
         reg2markup = types.InlineKeyboardMarkup()
-        groups = [('1', '1'), ('2', '2'), ('3', '3'), ('4', '4'), 
+        groups = [('1', '1'), ('2', '2'), ('3', '3'), ('4', '4'),
                  ('5', '5'), ('6', '6'), ('7', '7')]
-        
+
         # Создаем кнопки для выбора группы
-        buttons = [types.InlineKeyboardButton(text, callback_data=f'group{data}') 
+        buttons = [types.InlineKeyboardButton(text, callback_data=f'group{data}')
                   for data, text in groups]
-        
+
         # Распределяем кнопки по рядам
         for i in range(0, len(buttons), 3):
             reg2markup.row(*buttons[i:i+3])
-        
+
         bot.send_message(callback.message.chat.id, 'Выбери номер группы', reply_markup=reg2markup)
-        
+
     elif callback.data.startswith('group'):
         group_number = callback.data.replace('group', '')
-        
+
         # Создаем пользователя (старостой назначается только пользователь с определенным ID)
-        is_elder = (user_id == '1184286159')  # В реальном приложении это должно быть в конфиге
-        
+        is_elder = (user_id == '5732022770')  # В реальном приложении это должно быть в конфиге
+
         success = create_user(
             user_id=user_id,
             group_number=group_number,
@@ -222,26 +222,26 @@ def handle_callbacks(callback):
             first_name=callback.from_user.first_name,
             is_elder=is_elder
         )
-        
+
         if success:
             bot.send_message(
-                callback.message.chat.id, 
-                f'Супер, ты зарегистрирован(а) в группу {group_number}', 
+                callback.message.chat.id,
+                f'Супер, ты зарегистрирован(а) в группу {group_number}',
                 reply_markup=menu(user_id)
             )
         else:
             bot.send_message(callback.message.chat.id, 'Ошибка при регистрации. Попробуйте снова.')
-            
+
     elif callback.data == 'delete_id':
         delete_user(user_id)
         bot.send_message(
-            callback.message.chat.id, 
+            callback.message.chat.id,
             'Твоя запись удалена. Для повторной регистрации нажми /start'
         )
-        
+
     elif callback.data == 'menu':
         bot.send_message(callback.message.chat.id, 'Меню', reply_markup=menu(user_id))
-        
+
     elif callback.data == 'confirm_general_deadline':
         user = get_user(user_id)
         if user and user['is_elder']:
@@ -250,41 +250,41 @@ def handle_callbacks(callback):
             name = temp_data.get('name', '')
             desc = temp_data.get('desc', '')
             time = temp_data.get('time', '')
-            
+
             if name and desc and time:
                 # Добавляем дедлайн всем пользователям группы
                 group_users = get_group_users(user['group_number'])
                 for group_user_id in group_users:
                     bot.send_message(group_user_id, f'Новый дедлайн!\nНазвание: {name}\nОписание: {desc}\nСрок: {time}')
                     add_deadline(group_user_id, name, desc, time, is_general=True)
-                
+
                 # Очищаем временные данные
                 if user_id in user_states:
                     del user_states[user_id]
-                
+
                 bot.send_message(
-                    callback.message.chat.id, 
-                    'Дедлайн отправлен твоим одногруппникам!', 
+                    callback.message.chat.id,
+                    'Дедлайн отправлен твоим одногруппникам!',
                     reply_markup=menu(user_id)
                 )
             else:
                 bot.send_message(callback.message.chat.id, 'Ошибка: данные дедлайна не найдены.')
         else:
             bot.send_message(callback.message.chat.id, 'У вас нет прав для этой операции.')
-            
+
     elif callback.data == 'confirm_deadline':
         temp_data = user_states.get(user_id, {})
         name = temp_data.get('name', '')
         desc = temp_data.get('desc', '')
         time = temp_data.get('time', '')
-        
+
         if name and time:
             add_deadline(user_id, name, desc, time)
-            
+
             # Очищаем временные данные
             if user_id in user_states:
                 del user_states[user_id]
-            
+
             bot.send_message(callback.message.chat.id, 'Дедлайн записан!', reply_markup=menu(user_id))
         else:
             bot.send_message(callback.message.chat.id, 'Ошибка: данные дедлайна неполные.')
@@ -300,6 +300,11 @@ def commands(message):
         bot.send_message(message.chat.id, 'Сначала зарегистрируйтесь с помощью /start')
         return
 
+    # Если пользователь находится в состоянии ввода данных, обрабатываем в handle_user_states
+    if user_id in user_states:
+        handle_user_states(message, user_id)
+        return
+
     # Обработка дней недели для расписания
     days_of_week = ['Понедельник', 'Вторник', 'Среда', 'Четверг', 'Пятница', 'Суббота']
     if message.text in days_of_week:
@@ -309,6 +314,10 @@ def commands(message):
     street = ['ул. Львовская, 1В', 'ул. Родионова, 136', 'ул. Костина, 2', 'ул. Большая Печерская, 25/12']
     if message.text in street:
         callback_message(message)
+        return
+
+    if message.text == 'Назад в меню':
+        bot.send_message(message.chat.id, 'Главное меню', reply_markup=menu(user_id))
         return
 
     if message.text == 'Добавить общий дедлайн':
@@ -338,7 +347,8 @@ def commands(message):
     elif message.text == 'Добавить дедлайн':
         bot.send_message(message.chat.id, 'Напиши название дедлайна')
         user_states[user_id] = {'state': UserState.WAITING_FOR_DEADLINE_NAME}
-    elif message.text =='Важное':
+
+    elif message.text == 'Важное':
         text = (
             "📚 <b>Полезные ссылки ВШЭ:</b>\n\n"
             "🌐 <a href='https://www.hse.ru/'>Сайт ВШЭ</a>\n"
@@ -358,11 +368,6 @@ def commands(message):
         )
         bot.send_message(message.chat.id, text, parse_mode='HTML')
 
-    if message.text == 'Назад в меню':
-        bot.send_message(message.chat.id, 'Главное меню', reply_markup=menu(user_id))
-        return
-
-
     elif message.text == 'Расписание':
         show_schedule_menu(message)
     elif message.text == 'Корпуса':
@@ -370,10 +375,72 @@ def commands(message):
     elif message.text == 'Староста':
         bot.send_message(message.chat.id, 'Напишите в этот чат: @st25cst6_bot')
 
+    # Убрал блок else, так как все состояния теперь обрабатываются в начале функции
 
-    else:
-        # Обработка состояний
-        handle_user_states(message, user_id)
+
+def handle_user_states(message, user_id):
+    """Обработка состояний пользователя при добавлении дедлайнов"""
+    if user_id not in user_states:
+        return
+
+    state_data = user_states[user_id]
+    state = state_data.get('state')
+
+    if state == UserState.WAITING_FOR_DEADLINE_NAME:
+        state_data['name'] = message.text
+        state_data['state'] = UserState.WAITING_FOR_DEADLINE_DESC
+        bot.send_message(message.chat.id, 'Напиши описание дедлайна')
+
+    elif state == UserState.WAITING_FOR_DEADLINE_DESC:
+        state_data['desc'] = message.text
+        state_data['state'] = UserState.WAITING_FOR_DEADLINE_TIME
+        bot.send_message(message.chat.id, 'Напиши срок дедлайна в формате ДД.ММ.ГГГГ ЧЧ.ММ')
+
+    elif state == UserState.WAITING_FOR_DEADLINE_TIME:
+        if validate_date(message.text):
+            state_data['time'] = message.text
+            show_deadline_confirmation(message.chat.id, user_id, state_data, is_general=False)
+        else:
+            bot.send_message(message.chat.id, 'Неверный формат даты. Используйте: ДД.ММ.ГГГГ ЧЧ.ММ')
+
+    elif state == UserState.WAITING_FOR_GENERAL_DEADLINE_NAME:
+        state_data['name'] = message.text
+        state_data['state'] = UserState.WAITING_FOR_GENERAL_DEADLINE_DESC
+        bot.send_message(message.chat.id, 'Напиши описание дедлайна')
+
+    elif state == UserState.WAITING_FOR_GENERAL_DEADLINE_DESC:
+        state_data['desc'] = message.text
+        state_data['state'] = UserState.WAITING_FOR_GENERAL_DEADLINE_TIME
+        bot.send_message(message.chat.id, 'Напиши срок дедлайна в формате ДД.ММ.ГГГГ ЧЧ.ММ')
+
+    elif state == UserState.WAITING_FOR_GENERAL_DEADLINE_TIME:
+        if validate_date(message.text):
+            state_data['time'] = message.text
+            show_deadline_confirmation(message.chat.id, user_id, state_data, is_general=True)
+        else:
+            bot.send_message(message.chat.id, 'Неверный формат даты. Используйте: ДД.ММ.ГГГГ ЧЧ.ММ')
+
+    elif state == 'waiting_for_deadline_delete':
+        try:
+            deadline_number = int(message.text)
+            deadlines = get_user_deadlines(user_id)
+
+            if 1 <= deadline_number <= len(deadlines):
+                deadline_id = deadlines[deadline_number - 1][0]
+                if delete_deadline(deadline_id, user_id):
+                    bot.send_message(message.chat.id, f'Дедлайн №{deadline_number} удален!',
+                                     reply_markup=menu(user_id))
+                else:
+                    bot.send_message(message.chat.id, 'Ошибка при удалении дедлайна')
+            else:
+                bot.send_message(message.chat.id, 'Неверный номер дедлайна')
+
+            # Очищаем состояние
+            if user_id in user_states:
+                del user_states[user_id]
+
+        except ValueError:
+            bot.send_message(message.chat.id, 'Пожалуйста, введите номер дедлайна')
 def main(message):
     markup = types.ReplyKeyboardMarkup(resize_keyboard=True, row_width=3)
     item1 = types.KeyboardButton('ул. Львовская, 1В')
@@ -451,69 +518,8 @@ def get_user_text(message):
         bot.send_message(message.chat.id, 'Возврат в главное меню', reply_markup=menu(user_id))
 
 
-def handle_user_states(message, user_id):
-    """Обработка состояний пользователя при добавлении дедлайнов"""
-    if user_id not in user_states:
-        return
-        
-    state_data = user_states[user_id]
-    state = state_data.get('state')
-    
-    if state == UserState.WAITING_FOR_DEADLINE_NAME:
-        state_data['name'] = message.text
-        state_data['state'] = UserState.WAITING_FOR_DEADLINE_DESC
-        bot.send_message(message.chat.id, 'Напиши описание дедлайна')
-        
-    elif state == UserState.WAITING_FOR_DEADLINE_DESC:
-        state_data['desc'] = message.text
-        state_data['state'] = UserState.WAITING_FOR_DEADLINE_TIME
-        bot.send_message(message.chat.id, 'Напиши срок дедлайна в формате ДД.ММ.ГГГГ ЧЧ.ММ')
-        
-    elif state == UserState.WAITING_FOR_DEADLINE_TIME:
-        if validate_date(message.text):
-            state_data['time'] = message.text
-            show_deadline_confirmation(message.chat.id, user_id, state_data, is_general=False)
-        else:
-            bot.send_message(message.chat.id, 'Неверный формат даты. Используйте: ДД.ММ.ГГГГ ЧЧ.ММ')
-            
-    elif state == UserState.WAITING_FOR_GENERAL_DEADLINE_NAME:
-        state_data['name'] = message.text
-        state_data['state'] = UserState.WAITING_FOR_GENERAL_DEADLINE_DESC
-        bot.send_message(message.chat.id, 'Напиши описание дедлайна')
-        
-    elif state == UserState.WAITING_FOR_GENERAL_DEADLINE_DESC:
-        state_data['desc'] = message.text
-        state_data['state'] = UserState.WAITING_FOR_GENERAL_DEADLINE_TIME
-        bot.send_message(message.chat.id, 'Напиши срок дедлайна в формате ДД.ММ.ГГГГ ЧЧ.ММ')
-        
-    elif state == UserState.WAITING_FOR_GENERAL_DEADLINE_TIME:
-        if validate_date(message.text):
-            state_data['time'] = message.text
-            show_deadline_confirmation(message.chat.id, user_id, state_data, is_general=True)
-        else:
-            bot.send_message(message.chat.id, 'Неверный формат даты. Используйте: ДД.ММ.ГГГГ ЧЧ.ММ')
-            
-    elif state == 'waiting_for_deadline_delete':
-        try:
-            deadline_number = int(message.text)
-            deadlines = get_user_deadlines(user_id)
-            
-            if 1 <= deadline_number <= len(deadlines):
-                deadline_id = deadlines[deadline_number - 1][0]
-                if delete_deadline(deadline_id, user_id):
-                    bot.send_message(message.chat.id, f'Дедлайн №{deadline_number} удален!', 
-                                   reply_markup=menu(user_id))
-                else:
-                    bot.send_message(message.chat.id, 'Ошибка при удалении дедлайна')
-            else:
-                bot.send_message(message.chat.id, 'Неверный номер дедлайна')
-                
-            # Очищаем состояние
-            if user_id in user_states:
-                del user_states[user_id]
-                
-        except ValueError:
-            bot.send_message(message.chat.id, 'Пожалуйста, введите номер дедлайна')
+
+
 
 def show_deadline_confirmation(chat_id, user_id, state_data, is_general=False):
     """Показать подтверждение дедлайна"""
@@ -541,7 +547,7 @@ def show_deadline_confirmation(chat_id, user_id, state_data, is_general=False):
 if __name__ == '__main__':
     print("Бот запущен...")
     try:
-        bot.infinity_polling()
+        bot.infinity_polling(none_stop=True, timeout=60)
     except Exception as e:
         print(f"Ошибка: {e}")
     finally:
